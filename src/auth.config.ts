@@ -4,6 +4,10 @@ import type { NextAuthConfig } from "next-auth";
 // adapter ni providers que dependan de Prisma/bcrypt. La config completa
 // vive en auth.ts.
 export const authConfig = {
+  // Necesario fuera de Vercel (ej. Netlify) — Vercel detecta su propio host
+  // automáticamente, otros hosts no, y sin esto Auth.js rechaza toda
+  // solicitud con un error genérico de "server configuration".
+  trustHost: true,
   pages: {
     signIn: "/login",
   },
