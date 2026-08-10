@@ -1,0 +1,411 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // conexión pooled — usada por la app en runtime
+  directUrl = env("DIRECT_URL") // conexión directa — usada solo por Prisma Migrate
+}
+
+// ──────────────────────────────────────────────────────────
+// ENUMS
+// ──────────────────────────────────────────────────────────
+
+enum Rol {
+  CLIENTE
+  BARBERO
+  ADMIN
+}
+
+enum EstadoBarberoCita {
+  PENDIENTE // esperando respuesta del barbero (ventana de 15 min)
+  ACEPTADA
+  RECHAZADA
+  ASIGNADA_POR_ADMIN // admin asignó directamente, sin pasar por aceptación
+}
+
+enum EstadoPago {
+  SIN_COMPROBANTE
+  PENDIENTE_VALIDACION
+  APROBADO
+  RECHAZADO
+}
+
+enum EstadoCita {
+  RESERVADA // creada, aún sin barbero confirmado
+  CONFIRMADA // barbero aceptó (o admin asignó)
+  REQUIERE_ADMIN // nadie aceptó / sin barberos disponibles, necesita intervención manual
+  COMPLETADA
+  NO_SHOW
+  CANCELADA
+  REPROGRAMADA
+}
+
+enum TipoPago {
+  ADELANTO
+  TOTAL
+}
+
+enum EstadoIntento {
+  OFRECIDO
+  ACEPTADO
+  RECHAZADO
+  EXPIRADO // no respondió dentro de los 15 min
+  CANCELADO // el intento quedó sin efecto (ej. cliente canceló la cita)
+}
+
+enum TipoBloqueo {
+  DESCANSO
+  ALMUERZO
+  IMPREVISTO
+}
+
+enum CanalNotificacion {
+  WEB
+  EMAIL
+}
+
+enum EstadoPenalidad {
+  PENDIENTE
+  APLICADA
+}
+
+// ──────────────────────────────────────────────────────────
+// SEDE (preparado para multi-sede futuro; MVP opera con una sola)
+// ──────────────────────────────────────────────────────────
+
+model Sede {
+  id        String   @id @default(cuid())
+  nombre    String
+  direccion String
+  telefono  String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  barberos Barbero[]
+  citas    Cita[]
+  horarios HorarioAtencion[]
+}
+
+model HorarioAtencion {
+  id         String @id @default(cuid())
+  sede       Sede   @relation(fields: [sedeId], references: [id])
+  sedeId     String
+  diaSemana  Int // 0 = domingo ... 6 = sábado
+  horaInicio String // "09:00"
+  horaFin    String // "20:00"
+
+  @@unique([sedeId, diaSemana])
+}
+
+// ──────────────────────────────────────────────────────────
+// USUARIOS Y AUTH (Auth.js: Credentials + Google)
+// ──────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  nombre        String
+  email         String?   @unique
+  celular       String?   @unique
+  passwordHash  String?
+  emailVerified DateTime?
+  image         String?
+  rol           Rol       @default(CLIENTE)
+  activo        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  accounts Account[]
+  sessions Session[]
+
+  barbero              Barbero?
+  citasComoCliente     Cita[]              @relation("CitasCliente")
+  pagosValidados       Pago[]              @relation("PagosValidadosPor")
+  notificaciones       Notificacion[]
+  asignacionesForzadas IntentoAsignacion[] @relation("AsignacionesForzadasPorAdmin")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ──────────────────────────────────────────────────────────
+// BARBERO Y CATÁLOGO
+// ──────────────────────────────────────────────────────────
+
+model Barbero {
+  id                 String  @id @default(cuid())
+  user               User    @relation(fields: [userId], references: [id])
+  userId             String  @unique
+  sede               Sede    @relation(fields: [sedeId], references: [id])
+  sedeId             String
+  comisionPorcentaje Decimal @db.Decimal(5, 2) // % sobre el corte principal
+  activo             Boolean @default(true)
+
+  cortes             BarberoCorte[]
+  bloqueos           BloqueoHorario[]
+  horarios           BarberoHorario[]
+  citasAsignadas     Cita[]              @relation("CitasBarbero")
+  citasSegundaOpcion Cita[]              @relation("CitasBarberoBackup")
+  intentos           IntentoAsignacion[]
+}
+
+// Horario semanal propio de cada barbero (días que trabaja + rango horario
+// ese día). Debe caer dentro del horario general de la sede (HorarioAtencion);
+// eso se valida en la server action, no aquí. Si un barbero no tiene fila
+// para un diaSemana, simplemente no trabaja ese día — mismo patrón que
+// HorarioAtencion usa para "cerrado".
+model BarberoHorario {
+  id         String  @id @default(cuid())
+  barbero    Barbero @relation(fields: [barberoId], references: [id])
+  barberoId  String
+  diaSemana  Int // 0 = domingo ... 6 = sábado
+  horaInicio String // "13:00"
+  horaFin    String // "20:00"
+
+  @@unique([barberoId, diaSemana])
+}
+
+model Corte {
+  id          String  @id @default(cuid())
+  nombre      String
+  descripcion String
+  precio      Decimal @db.Decimal(10, 2)
+  fotoUrl     String?
+  categoria   String // "moderno" | "clasico" — heredado, ya no se usa en código nuevo
+  activo      Boolean @default(true)
+
+  // Agrupación real para la landing (ej. "Pelo largo", "Corte pegado"),
+  // gestionada desde el panel de admin. Opcional a propósito: todavía no
+  // hay categorías reales cargadas, así que un corte sin categoriaCorteId
+  // simplemente aparece sin agrupar.
+  categoriaCorte   CategoriaCorte? @relation(fields: [categoriaCorteId], references: [id])
+  categoriaCorteId String?
+
+  barberos BarberoCorte[]
+  citas    Cita[]
+}
+
+model CategoriaCorte {
+  id     String  @id @default(cuid())
+  nombre String
+  orden  Int     @default(0)
+  activo Boolean @default(true)
+
+  cortes Corte[]
+}
+
+model BarberoCorte {
+  barbero   Barbero @relation(fields: [barberoId], references: [id])
+  barberoId String
+  corte     Corte   @relation(fields: [corteId], references: [id])
+  corteId   String
+
+  @@id([barberoId, corteId])
+}
+
+model Adicional {
+  id          String  @id @default(cuid())
+  nombre      String // Perfilado de cejas, Barba, Bigote
+  descripcion String?
+  precio      Decimal @db.Decimal(10, 2)
+  activo      Boolean @default(true)
+
+  citaAdicionales CitaAdicional[]
+}
+
+model BloqueoHorario {
+  id         String      @id @default(cuid())
+  barbero    Barbero     @relation(fields: [barberoId], references: [id])
+  barberoId  String
+  fecha      DateTime    @db.Date
+  horaInicio String
+  horaFin    String
+  tipo       TipoBloqueo
+  createdAt  DateTime    @default(now())
+}
+
+// ──────────────────────────────────────────────────────────
+// CITA (núcleo del sistema)
+// ──────────────────────────────────────────────────────────
+
+model Cita {
+  id     String @id @default(cuid())
+  sede   Sede   @relation(fields: [sedeId], references: [id])
+  sedeId String
+
+  // Nulo cuando es un servicio presencial para alguien sin cuenta ("cliente
+  // no registrado") — el barbero no crea una cuenta a nombre de esa persona.
+  cliente   User?   @relation("CitasCliente", fields: [clienteId], references: [id])
+  clienteId String?
+
+  corte       Corte   @relation(fields: [corteId], references: [id])
+  corteId     String
+  precioCorte Decimal @db.Decimal(10, 2) // snapshot del precio al reservar
+
+  barbero   Barbero? @relation("CitasBarbero", fields: [barberoId], references: [id])
+  barberoId String?
+
+  barberoSegundaOpcion    Barbero? @relation("CitasBarberoBackup", fields: [barberoSegundaOpcionId], references: [id])
+  barberoSegundaOpcionId  String?
+  segundaOpcionAutomatica Boolean  @default(false) // true si la 2da opción es "automático"
+  asignacionAutomatica    Boolean  @default(false) // true si la 1ra opción fue "automático"
+
+  // true = el barbero registró el servicio en el momento (cliente presencial,
+  // sin pasar por el flujo de reserva online). Ver Pago.metodoPago.
+  esPresencial Boolean @default(false)
+
+  fecha      DateTime @db.Date
+  horaInicio String
+  horaFin    String
+
+  estado        EstadoCita        @default(RESERVADA)
+  estadoBarbero EstadoBarberoCita @default(PENDIENTE)
+  estadoPago    EstadoPago        @default(SIN_COMPROBANTE)
+
+  adicionales CitaAdicional[]
+  pagos       Pago[]
+  intentos    IntentoAsignacion[]
+
+  penalidadOrigen   Penalidad[] @relation("PenalidadDeEstaCita")
+  penalidadAplicada Penalidad[] @relation("PenalidadCobradaEnEstaCita")
+
+  // Calificación del cliente al barbero por este servicio puntual — solo
+  // aplica una vez que estado=COMPLETADA. Vive acá (no en tabla aparte)
+  // porque es 1:1 con la cita; el promedio de un barbero se calcula
+  // agregando sobre sus Citas, no hace falta desnormalizarlo.
+  calificacionEstrellas  Int?
+  calificacionComentario String?
+  calificadaEn           DateTime?
+  // Marca esta calificación para mostrarla como testimonio en la landing.
+  calificacionPublicada  Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CitaAdicional {
+  cita        Cita      @relation(fields: [citaId], references: [id])
+  citaId      String
+  adicional   Adicional @relation(fields: [adicionalId], references: [id])
+  adicionalId String
+  precio      Decimal   @db.Decimal(10, 2) // snapshot del precio al reservar
+
+  @@id([citaId, adicionalId])
+}
+
+// Auditoría del flujo de asignación/reasignación (B2/B3/C5).
+// Fuente única de verdad de "quién quedó asignado y cómo" — incluye también
+// las asignaciones directas del admin (esAsignacionAdmin=true, estado=ACEPTADO
+// creado de inmediato), para que reportes e historial de barbero no tengan
+// que mirar dos lugares distintos.
+model IntentoAsignacion {
+  id           String        @id @default(cuid())
+  cita         Cita          @relation(fields: [citaId], references: [id])
+  citaId       String
+  barbero      Barbero       @relation(fields: [barberoId], references: [id])
+  barberoId    String
+  orden        Int // 1 = primera opción del cliente, 2 = segunda opción, 3+ = reasignación automática por carga
+  estado       EstadoIntento @default(OFRECIDO)
+  ofrecidoEn   DateTime      @default(now())
+  respondidoEn DateTime?
+
+  esAsignacionAdmin Boolean @default(false)
+  asignadoPor       User?   @relation("AsignacionesForzadasPorAdmin", fields: [asignadoPorId], references: [id])
+  asignadoPorId     String?
+}
+
+// ──────────────────────────────────────────────────────────
+// PAGOS (comprobante Yape/Plin, validación exclusiva de admin — A6)
+// ──────────────────────────────────────────────────────────
+
+model Pago {
+  id             String      @id @default(cuid())
+  cita           Cita        @relation(fields: [citaId], references: [id])
+  citaId         String
+  tipo           TipoPago
+  monto          Decimal     @db.Decimal(10, 2)
+  // Nulo para pagos de servicios presenciales (no hay comprobante que subir,
+  // ver metodoPago).
+  urlComprobante String?
+  // Solo se usa en pagos de servicios presenciales — Yape/Plin de reserva
+  // online siguen identificándose solo por el comprobante subido.
+  metodoPago     MetodoPago?
+  estado         EstadoPago  @default(PENDIENTE_VALIDACION)
+  validadoPor    User?       @relation("PagosValidadosPor", fields: [validadoPorId], references: [id])
+  validadoPorId  String?
+  validadoEn     DateTime?
+  createdAt      DateTime    @default(now())
+}
+
+enum MetodoPago {
+  EFECTIVO
+  YAPE
+  PLIN
+}
+
+// ──────────────────────────────────────────────────────────
+// PENALIDADES (regla de negocio sección 4)
+// ──────────────────────────────────────────────────────────
+
+model Penalidad {
+  id             String  @id @default(cuid())
+  citaOrigen     Cita    @relation("PenalidadDeEstaCita", fields: [citaOrigenId], references: [id])
+  citaOrigenId   String
+  montoPenalidad Decimal @db.Decimal(10, 2) // 15% del precio del corte
+
+  montoDescontadoAdelanto Decimal @default(0) @db.Decimal(10, 2) // lo que se descuenta del adelanto ya pagado
+  saldoPendiente          Decimal @default(0) @db.Decimal(10, 2) // diferencia que se carga a la siguiente cita
+
+  citaDestino   Cita?   @relation("PenalidadCobradaEnEstaCita", fields: [citaDestinoId], references: [id])
+  citaDestinoId String?
+
+  estado    EstadoPenalidad @default(PENDIENTE)
+  createdAt DateTime        @default(now())
+}
+
+// ──────────────────────────────────────────────────────────
+// NOTIFICACIONES
+// ──────────────────────────────────────────────────────────
+
+model Notificacion {
+  id        String            @id @default(cuid())
+  user      User              @relation(fields: [userId], references: [id])
+  userId    String
+  tipo      String
+  mensaje   String
+  canal     CanalNotificacion
+  leido     Boolean           @default(false)
+  createdAt DateTime          @default(now())
+}
