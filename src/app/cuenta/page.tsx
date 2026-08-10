@@ -1,5 +1,6 @@
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { CerrarSesionBoton } from "@/components/cerrar-sesion-boton";
 
 // Depende de la sesión de quien visita — ver nota en src/app/reservar/page.tsx.
 export const dynamic = "force-dynamic";
@@ -23,19 +24,7 @@ export default async function CuentaPage() {
         </h1>
       </div>
 
-      <form
-        action={async () => {
-          "use server";
-          await signOut({ redirectTo: "/" });
-        }}
-      >
-        <button
-          type="submit"
-          className="rounded-full border border-ink-border-2 px-6 py-3 text-[13px] font-bold uppercase tracking-[1px] text-cream transition-colors hover:border-brass hover:text-brass"
-        >
-          Cerrar sesión
-        </button>
-      </form>
+      <CerrarSesionBoton className="rounded-full border border-ink-border-2 px-6 py-3 text-[13px] font-bold uppercase tracking-[1px] text-cream transition-colors hover:border-brass hover:text-brass" />
     </div>
   );
 }

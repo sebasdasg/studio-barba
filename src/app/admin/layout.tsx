@@ -1,5 +1,6 @@
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { CerrarSesionBoton } from "@/components/cerrar-sesion-boton";
 
 // Todo el panel de admin depende de sesión — ver nota en
 // src/app/reservar/page.tsx. Puesto en el layout, cubre cada página hija.
@@ -12,19 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div>
       <div className="flex justify-end bg-ink px-6 pt-6 sm:px-[6vw]">
-        <form
-          action={async () => {
-            "use server";
-            await signOut({ redirectTo: "/" });
-          }}
-        >
-          <button
-            type="submit"
-            className="text-sm text-cream/60 transition-colors hover:text-brass"
-          >
-            Cerrar sesión
-          </button>
-        </form>
+        <CerrarSesionBoton className="text-sm text-cream/60 transition-colors hover:text-brass" />
       </div>
       {children}
     </div>

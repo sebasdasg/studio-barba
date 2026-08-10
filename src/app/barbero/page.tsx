@@ -1,8 +1,9 @@
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
+import { CerrarSesionBoton } from "@/components/cerrar-sesion-boton";
 import { AccionesConfirmada, AccionesPendiente } from "./acciones-cita";
 
 // Depende de la sesión de quien visita — ver nota en src/app/reservar/page.tsx.
@@ -164,19 +165,7 @@ export default async function PanelBarberoPage() {
             >
               Mi horario
             </Link>
-            <form
-              action={async () => {
-                "use server";
-                await signOut({ redirectTo: "/" });
-              }}
-            >
-              <button
-                type="submit"
-                className="rounded-full border border-ink-border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-cream transition-colors hover:border-brass hover:text-brass"
-              >
-                Cerrar sesión
-              </button>
-            </form>
+            <CerrarSesionBoton className="rounded-full border border-ink-border-2 px-4 py-2 text-xs font-bold uppercase tracking-wide text-cream transition-colors hover:border-brass hover:text-brass" />
           </div>
         </div>
 

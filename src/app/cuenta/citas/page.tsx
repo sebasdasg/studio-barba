@@ -1,9 +1,10 @@
-import { auth, signOut } from "@/auth";
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 import { CancelarCitaBoton } from "@/components/cancelar-cita-boton";
+import { CerrarSesionBoton } from "@/components/cerrar-sesion-boton";
 import { esEstadoActivo } from "@/lib/reservas/cancelacion";
 import { SubirComprobanteForm } from "./subir-comprobante-form";
 import { CalificarForm } from "./calificar-form";
@@ -68,19 +69,7 @@ export default async function MisCitasPage() {
             >
               Reservar cita
             </Link>
-            <form
-              action={async () => {
-                "use server";
-                await signOut({ redirectTo: "/" });
-              }}
-            >
-              <button
-                type="submit"
-                className="rounded-full border border-ink-border-2 px-5 py-2.5 text-[13px] font-bold uppercase tracking-[1px] text-cream transition-colors hover:border-brass hover:text-brass"
-              >
-                Cerrar sesión
-              </button>
-            </form>
+            <CerrarSesionBoton className="rounded-full border border-ink-border-2 px-5 py-2.5 text-[13px] font-bold uppercase tracking-[1px] text-cream transition-colors hover:border-brass hover:text-brass" />
           </div>
         </div>
 
