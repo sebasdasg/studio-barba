@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
+// Depende de la sesión de quien visita — ver nota en src/app/reservar/page.tsx.
+export const dynamic = "force-dynamic";
+
 const ESTADO_LABEL: Record<string, string> = {
   RESERVADA: "Pendiente de aceptar",
   CONFIRMADA: "Confirmada",

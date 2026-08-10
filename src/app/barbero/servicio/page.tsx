@@ -4,6 +4,9 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ServicioForm } from "./servicio-form";
 
+// Depende de la sesión de quien visita — ver nota en src/app/reservar/page.tsx.
+export const dynamic = "force-dynamic";
+
 export default async function BarberoServicioPage() {
   const session = await auth();
   if (!session?.user || session.user.rol !== "BARBERO") redirect("/cuenta");

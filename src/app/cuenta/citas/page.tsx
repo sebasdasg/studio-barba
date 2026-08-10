@@ -8,6 +8,9 @@ import { esEstadoActivo } from "@/lib/reservas/cancelacion";
 import { SubirComprobanteForm } from "./subir-comprobante-form";
 import { CalificarForm } from "./calificar-form";
 
+// Depende de la sesión de quien visita — ver nota en src/app/reservar/page.tsx.
+export const dynamic = "force-dynamic";
+
 const ESTADO_LABEL: Record<string, string> = {
   RESERVADA: "Reservada",
   CONFIRMADA: "Confirmada",

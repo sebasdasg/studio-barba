@@ -1,6 +1,9 @@
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
 
+// Depende de la sesión de quien visita — ver nota en src/app/reservar/page.tsx.
+export const dynamic = "force-dynamic";
+
 export default async function CuentaPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");

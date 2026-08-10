@@ -5,6 +5,12 @@ import { ReservaWizard } from "./reserva-wizard";
 import { obtenerCitaActiva } from "./actions";
 import { CitaActivaAlerta } from "./cita-activa-alerta";
 
+// Depende de la sesión de quien visita — sin esto, algunos hosts (Netlify
+// entre ellos) pueden prerenderizar y cachear esta página como si fuera
+// estática, sirviendo el mismo contenido (o falta de redirección a login)
+// a cualquier visitante sin importar su sesión real.
+export const dynamic = "force-dynamic";
+
 export default async function ReservarPage() {
   const session = await auth();
   if (!session?.user) redirect("/login");

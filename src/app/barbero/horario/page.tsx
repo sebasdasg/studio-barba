@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { HorarioBarberoDia } from "@/components/horario-barbero-dia";
 import { guardarMiHorarioDia } from "@/lib/reservas/horario-barbero-actions";
 
+// Depende de la sesión de quien visita — ver nota en src/app/reservar/page.tsx.
+export const dynamic = "force-dynamic";
+
 const NOMBRES_DIA = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
 export default async function BarberoHorarioPage() {

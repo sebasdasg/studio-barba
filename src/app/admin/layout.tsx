@@ -1,6 +1,10 @@
 import { auth, signOut } from "@/auth";
 import { redirect } from "next/navigation";
 
+// Todo el panel de admin depende de sesión — ver nota en
+// src/app/reservar/page.tsx. Puesto en el layout, cubre cada página hija.
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user || session.user.rol !== "ADMIN") redirect("/cuenta");

@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
 import { AccionesConfirmada, AccionesPendiente } from "./acciones-cita";
 
+// Depende de la sesión de quien visita — ver nota en src/app/reservar/page.tsx.
+export const dynamic = "force-dynamic";
+
 const ESTADO_LABEL: Record<string, string> = {
   RESERVADA: "Reservada",
   CONFIRMADA: "Confirmada",
