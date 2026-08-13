@@ -47,7 +47,9 @@ export async function crearAdmin(
 
   const passwordHash = await bcrypt.hash(password, 10);
   await prisma.user.create({
-    data: { nombre: nombre.trim(), celular, email, passwordHash, rol: "ADMIN" },
+    // Lo crea un admin ya autenticado, no el registro público — el correo
+    // no necesita el paso de verificación.
+    data: { nombre: nombre.trim(), celular, email, passwordHash, rol: "ADMIN", emailVerified: new Date() },
   });
 
   revalidatePath("/admin/administradores");

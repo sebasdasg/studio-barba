@@ -9,6 +9,25 @@ const estadoInicial: RegistroState = {};
 export default function RegistroPage() {
   const [estado, formAction, pendiente] = useActionState(registrarCliente, estadoInicial);
 
+  if (estado.ok) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-ink px-6 py-16">
+        <div className="w-full max-w-sm text-center">
+          <h1 className="font-display text-4xl uppercase text-cream">Revisa tu correo</h1>
+          <p className="mt-3 text-sm text-cream/60">
+            Te enviamos un enlace para confirmar tu cuenta. Ábrelo para poder iniciar sesión.
+          </p>
+          <Link
+            href="/login"
+            className="mt-6 inline-block rounded-full bg-brass px-6 py-3 text-[13px] font-bold uppercase tracking-[1px] text-ink transition-colors hover:bg-brass-hover"
+          >
+            Iniciar sesión
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-ink px-6 py-16">
       <div className="w-full max-w-sm">
@@ -52,7 +71,10 @@ export default function RegistroPage() {
               required
               className="mt-1.5 w-full rounded border border-ink-border-2 bg-transparent px-4 py-3 text-cream outline-none focus:border-brass"
             />
-            <p className="mt-1 text-xs text-cream/40">Lo usamos solo si necesitas recuperar tu contraseña.</p>
+            <p className="mt-1 text-xs text-cream/40">
+              Te enviaremos un enlace para confirmar tu cuenta y, si lo necesitas, recuperar tu
+              contraseña.
+            </p>
           </div>
           <div>
             <label className="text-xs uppercase tracking-wide text-cream/60" htmlFor="password">

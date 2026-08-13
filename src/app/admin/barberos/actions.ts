@@ -60,7 +60,9 @@ export async function crearBarbero(
 
   await prisma.$transaction(async (tx) => {
     const user = await tx.user.create({
-      data: { nombre: nombre.trim(), celular, email, passwordHash, rol: "BARBERO" },
+      // Lo crea un admin ya autenticado, no el registro público — el correo
+      // no necesita el paso de verificación.
+      data: { nombre: nombre.trim(), celular, email, passwordHash, rol: "BARBERO", emailVerified: new Date() },
     });
     const barbero = await tx.barbero.create({
       data: { userId: user.id, sedeId: sede.id, comisionPorcentaje: comision },

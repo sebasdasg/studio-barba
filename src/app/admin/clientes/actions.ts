@@ -29,7 +29,8 @@ export async function actualizarCliente(
     return { error: "Ingresa un correo válido." };
   }
 
-  const [celularEnUso, emailEnUso] = await Promise.all([
+  const [clienteActual, celularEnUso, emailEnUso] = await Promise.all([
+    prisma.user.findUnique({ where: { id: clienteId }, select: { email: true } }),
     prisma.user.findFirst({ where: { celular: datos.celular, NOT: { id: clienteId } } }),
     datos.email
       ? prisma.user.findFirst({ where: { email: datos.email, NOT: { id: clienteId } } })
@@ -38,13 +39,19 @@ export async function actualizarCliente(
   if (celularEnUso) return { error: "Ese celular ya lo usa otra cuenta." };
   if (emailEnUso) return { error: "Ese correo ya lo usa otra cuenta." };
 
+  const nuevoEmail = datos.email || null;
+  const cambioDeEmail = nuevoEmail !== clienteActual?.email;
+
   await prisma.user.update({
     where: { id: clienteId },
     data: {
       nombre: datos.nombre.trim(),
       celular: datos.celular,
-      email: datos.email || null,
+      email: nuevoEmail,
       activo: datos.activo,
+      // Lo ingresa un admin ya autenticado — a diferencia del registro
+      // público, acá no hace falta el paso de verificación por correo.
+      ...(cambioDeEmail && nuevoEmail ? { emailVerified: new Date() } : {}),
     },
   });
 

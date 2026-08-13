@@ -22,7 +22,11 @@ export default function LoginPage() {
     setCargando(false);
 
     if (res?.error) {
-      setError("Celular o contraseña incorrectos.");
+      setError(
+        res.code === "correo_no_verificado"
+          ? "Todavía no confirmaste tu correo. Revisa el enlace que te enviamos al registrarte."
+          : "Celular o contraseña incorrectos."
+      );
       return;
     }
 

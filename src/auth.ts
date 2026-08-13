@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import type { Adapter, AdapterUser } from "next-auth/adapters";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
@@ -6,6 +6,10 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "./auth.config";
+
+class CorreoNoVerificadoError extends CredentialsSignin {
+  code = "correo_no_verificado";
+}
 
 // El modelo User usa "nombre", no el "name" estándar que PrismaAdapter
 // asume (viene de perfiles OAuth como Google). Sin esta traducción,
@@ -31,8 +35,11 @@ function buildAdapter(): Adapter {
       return conNombreComoName(await base.getUserByAccount!(account));
     },
     async createUser({ id: _id, name, ...data }) {
+      // Un proveedor OAuth (Google) ya probó que el usuario controla ese
+      // correo al iniciar sesión con él — a diferencia del registro manual,
+      // acá no hace falta el paso extra de verificación por correo.
       const creado = await prisma.user.create({
-        data: { ...data, nombre: name?.trim() || "Cliente" },
+        data: { ...data, nombre: name?.trim() || "Cliente", emailVerified: new Date() },
       });
       return conNombreComoName(creado)!;
     },
@@ -66,6 +73,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const esValido = await bcrypt.compare(password, user.passwordHash);
         if (!esValido) return null;
+
+        // Cuentas sin correo (demo/legado, de antes de exigirlo en el
+        // registro) no pueden verificar nada — no las bloqueamos.
+        if (user.email && !user.emailVerified) throw new CorreoNoVerificadoError();
 
         return {
           id: user.id,
