@@ -32,11 +32,27 @@ export async function registrarCliente(
     prisma.user.findUnique({ where: { celular } }),
     prisma.user.findUnique({ where: { email } }),
   ]);
-  if (existenteCelular) {
+
+  // Un registro previo con este celular que nunca se confirmó (p. ej. un
+  // typo en el correo) no debe dejar el celular bloqueado para siempre —
+  // lo reemplazamos por el intento nuevo en vez de rechazarlo. Exigimos que
+  // tenga correo para no tocar cuentas viejas (de antes de exigirlo) que
+  // nunca pasaron por este flujo, como clientes reales ya activos.
+  const celularEsPendiente =
+    !!existenteCelular && !!existenteCelular.email && !existenteCelular.emailVerified;
+
+  if (existenteCelular && !celularEsPendiente) {
     return { error: "Ya existe una cuenta con ese celular." };
   }
-  if (existenteEmail) {
+  if (existenteEmail && existenteEmail.id !== existenteCelular?.id) {
     return { error: "Ya existe una cuenta con ese correo." };
+  }
+
+  if (celularEsPendiente && existenteCelular?.email) {
+    await prisma.$transaction([
+      prisma.verificationToken.deleteMany({ where: { identifier: existenteCelular.email } }),
+      prisma.user.delete({ where: { id: existenteCelular.id } }),
+    ]);
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
